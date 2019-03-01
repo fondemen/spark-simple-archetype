@@ -95,7 +95,6 @@ docker service create --name spark-worker --mode global --network spark-nw -e SP
 ```
 
 The master is visible at <http://192.168.2.100:8080>.
-```
 
 ## Submitting your Spark analysis
 
