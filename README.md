@@ -95,7 +95,12 @@ docker service create --name spark-worker --mode global --network spark-nw -e SP
 
 ```
 
-The master is visible at <http://192.168.2.100:8080>.
+The master (and only the master) is visible at <http://192.168.2.100:8080>.
+To see also workers activity, use a proxy such as Sqid :
+```
+docker service create --name squid --replicas 1 --network spark-nw -p 3128:3128 chrisdaish/squid
+```
+Then configure your browser to use an HTTP proxy server with `192.168.2.100` as the host and `3128` as the port.
 
 ## Submitting your Spark analysis
 
