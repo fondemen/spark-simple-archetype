@@ -84,8 +84,9 @@ Not ready for production !
 In case you use the Vagrant approach, login to the first node : `vagrant ssh docker-01`.
 
 ```
-docker image pull gettyimages/spark:2.3.1-hadoop-2.8
-docker tag gettyimages/spark:2.3.1-hadoop-2.8 localhost:5000/spark
+export IMAGE='gettyimages/spark:2.3.1-hadoop-3.0' # check https://hub.docker.com/r/gettyimages/spark/tags
+docker image pull $IMAGE
+docker tag $IMAGE localhost:5000/spark
 docker service create --name registry --publish 5000:5000 registry:2
 docker push localhost:5000/spark # so that other nodes get the image
 docker network create -d overlay spark-nw
