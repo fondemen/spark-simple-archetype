@@ -108,6 +108,13 @@ In case you use the Vagrant approach, you must have [uploaded](#uploading-jar-to
 
 We assume here that your Spark analysis is available on ./ana.jar.
 
+### Directly creatting the swarm service
+
+```
+docker service create --name ana -p 4040:4040 --network spark-nw --restart-condition none --constraint "node.role == manager" --mount source=$(pwd)/ana.jar,target=/ana.jar,type=bind localhost:5000/spark bin/spark-submit /ana.jar spark://spark-master:7077
+```
+### Using a dedicated image
+
 Create a file name Dockerfile with the following content using nano:
 
 ```
