@@ -39,8 +39,7 @@ The following fires a 3 node cluster (can be changed using the NODES environment
 ```
 git clone --depth=1 https://github.com/fondemen/coreos-swarm-vagrant.git
 cd coreos-swarm-vagrant
-vagrant box update
-vagrant up
+./bootstrap-swarm.sh
 ```
 You might need to select an ethernet interface to connect to ; usually, the first one is best.
 
@@ -48,17 +47,9 @@ To re-use an previously started-then-stopped cluster
 
 ```
 cd coreos-swarm-vagrant
-rm etcd_token_url
 vagrant up
 ```
-
-You must wait for etcd to be up and running on all nodes. Checking can be done using `vagrant ssh docker-01 -c 'etcdctl cluster-health'`
-
-Now, you can build the docker swarm cluster:
-
-```
-SWARM=on vagrant up
-```
+You might need to `vagrant destroy -f && rm etcd_token_url && ./bootstrap-swarm.sh` in case the above fails.
 
 To start running docker commands, ssh the first virtual node:
 
@@ -74,7 +65,7 @@ The easiest is to install the scp plugin: `vagrant plugin install vagrant-scp`
 Compile you project as [explained above](#compile-project)
 
 ```
-vagrant scp [location of your spark project]/target/target/your_project-SNAPSHOT.jar docker-01:~/ana.jar
+vagrant scp [location of your spark project]/target/your_project-SNAPSHOT.jar docker-01:~/ana.jar
 ```
 
 ## Firing up a spark cluster
@@ -100,7 +91,7 @@ To see also workers activity, use a proxy such as Sqid :
 ```
 docker service create --name squid --replicas 1 --network spark-nw -p 3128:3128 chrisdaish/squid
 ```
-Then configure your browser to use an HTTP proxy server with `192.168.2.100` as the host and `3128` as the port.
+Then configure your browser to use an HTTP proxy server with host `192.168.2.100` and port `3128`.
 
 ## Submitting your Spark analysis
 
@@ -108,7 +99,7 @@ In case you use the Vagrant approach, you must have [uploaded](#uploading-jar-to
 
 We assume here that your Spark analysis is available on ./ana.jar.
 
-### Directly creatting the swarm service
+### Directly creating the swarm service
 
 ```
 docker service create --name ana -p 4040:4040 --network spark-nw --restart-condition none --constraint "node.role == manager" --mount source=$(pwd)/ana.jar,target=/ana.jar,type=bind localhost:5000/spark bin/spark-submit /ana.jar spark://spark-master:7077
@@ -133,7 +124,7 @@ docker service create --name ana --restart-condition none --network spark-nw -p 
 docker service logs -f ana
 ```
 
-You can check your task at 
+You can check your task at http://192.168.2.100:4040.
 
 Use ^D to exit logs.
 
