@@ -12,19 +12,21 @@ import org.apache.spark.api.java.JavaSparkContext;
 
 public class Main {
 
-	public static final String APP_NAME = "${artifactId}";
-
 	public static void main(String[] args) throws Exception {
-		String master;
-
-		if (args.length > 0) {
-			master = args[0];
-		} else {
-			master = "local[*]";
-		}
 
 		long start = System.currentTimeMillis();
-		SparkConf conf = new SparkConf().setAppName(APP_NAME).setMaster(master);
+		SparkConf conf = new SparkConf().setAppName("${artifactId}");
+
+		String master = System.getProperty("spark.master");
+		if (master == null || master.trim().length() == 0) {
+			System.out.println("No master found ; running locally");
+			conf = conf
+				.setMaster("local[*]")
+				.set("spark.driver.host", "127.0.0.1")
+				;
+		} else {
+			System.out.println("Master found to be " + master);
+		}
 
 		// Tries to determine necessary jar
 		String source = Main.class.getProtectionDomain().getCodeSource().getLocation().getPath();

@@ -14,7 +14,7 @@ mvn archetype:generate \
   -DartifactId=your_project \
   -DarchetypeGroupId=fr.uha.ensisa.ff \
   -DarchetypeArtifactId=spark-simple-archetype \
-  -DarchetypeVersion=0.0.4 \
+  -DarchetypeVersion=0.0.5 \
   -DinteractiveMode=false
 ```
 
@@ -22,9 +22,7 @@ mvn archetype:generate \
 
 To compile your project: `mvn clean verify`
 
-To run locally (once compiled): `java -jar target/your_project-SNAPSHOT.jar`
-
-Tu submit to a spark cluster: `spark-submit target/your_project-SNAPSHOT.jar spark://spark-master:7077`
+To run locally (once compiled): `java -jar target/your_project-*.jar`
 
 # Running a cluster using docker swarm
 
@@ -39,7 +37,7 @@ The following fires a 3 node cluster (can be changed using the NODES environment
 ```
 git clone --depth=1 https://github.com/fondemen/coreos-swarm-vagrant.git
 cd coreos-swarm-vagrant
-./bootstrap-swarm.sh
+./bootstrap-swarm.sh 3
 ```
 You might need to select an ethernet interface to connect to ; usually, the first one is best.
 
@@ -49,13 +47,7 @@ To re-use an previously started-then-stopped cluster
 cd coreos-swarm-vagrant
 vagrant up
 ```
-You might need to `vagrant destroy -f && rm etcd_token_url && ./bootstrap-swarm.sh` in case the above fails.
-
-To start running docker commands, ssh the first virtual node:
-
-```
-vagrant ssh docker-01
-```
+You might need to `vagrant destroy -f && rm etcd_token_url && ./bootstrap-swarm.sh 3` in case the above fails.
 
 Please, check the [coreos-swarm-vagrant](https://github.com/fondemen/coreos-swarm-vagrant) project for more details on setting up the swarm cluster.
 
@@ -65,68 +57,46 @@ The easiest is to install the scp plugin: `vagrant plugin install vagrant-scp`
 Compile you project as [explained above](#compile-project)
 
 ```
-vagrant scp [location of your spark project]/target/your_project-SNAPSHOT.jar docker-01:~/ana.jar
+for m in $(vagrant status --machine-readable | grep ',state,' | cut -d, -f2); do vagrant scp ../your_project/target/your_project-*.jar $m:~/ana.jar; done
 ```
 
 ## Firing up a spark cluster
 
 Not ready for production !
 
-In case you use the Vagrant approach, login to the first node : `vagrant ssh docker-01`.
+In case you use the Vagrant approach, login to the first node : `vagrant ssh`.
 
 ```
-export IMAGE='gettyimages/spark:2.3.1-hadoop-3.0' # check https://hub.docker.com/r/gettyimages/spark/tags
-docker image pull $IMAGE
-docker tag $IMAGE localhost:5000/spark
-docker service create --name registry --publish 5000:5000 registry:2
-docker push localhost:5000/spark # so that other nodes get the image
 docker network create -d overlay spark-nw
-docker service create --name spark-master --replicas 1 --network spark-nw  -e SERVICE_PORTS=7077 -p 7077:7077 -p 8080:8080 -p 6066:6066 localhost:5000/spark bin/spark-class org.apache.spark.deploy.master.Master
-docker service create --name spark-worker --mode global --network spark-nw -e SPARK_WORKER_CORES=1 -e SPARK_WORKER_MEMORY=1g --limit-memory 1280M localhost:5000/spark bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-
+docker service create --name spark-master --replicas 1 --network spark-nw  -e INIT_DAEMON_STEP=setup_spark -p 8080:8080 bde2020/spark-master:2.4.5-hadoop2.7
+docker service create --name spark-worker --mode global --network spark-nw  -e "SPARK_MASTER=spark://spark-master:7077" --limit-memory 1280M bde2020/spark-worker:2.4.5-hadoop2.7
 ```
 
-The master (and only the master) is visible at <http://192.168.2.100:8080>.
+The master (and only the master) is visible at http://192.168.2.100:8080.
 To see also workers activity, use a proxy such as Sqid :
+
 ```
 docker service create --name squid --replicas 1 --network spark-nw -p 3128:3128 chrisdaish/squid
 ```
+
 Then configure your browser to use an HTTP proxy server with host `192.168.2.100` and port `3128`.
 
 ## Submitting your Spark analysis
 
-In case you use the Vagrant approach, you must have [uploaded](#uploading-jar-to-vagrant-node) your Spark program and logged in to docker-01 using `vagrant ssh docker-01`.
+In case you use the Vagrant approach, you must have [uploaded](#uploading-jar-to-vagrant-node) your Spark program and logged in to docker-01 using `vagrant ssh`.
+```
 
 We assume here that your Spark analysis is available on ./ana.jar.
 
-### Directly creating the swarm service
+Change the main class path in the following command:
 
 ```
-docker service create --name ana -p 4040:4040 --network spark-nw --restart-condition none --constraint "node.role == manager" --mount source=$(pwd)/ana.jar,target=/ana.jar,type=bind localhost:5000/spark bin/spark-submit /ana.jar spark://spark-master:7077
-```
-### Using a dedicated image
-
-Create a file name Dockerfile with the following content using nano:
-
-```
-FROM openjdk:8-jre-alpine
-COPY ./ana.jar /usr/ana.jar
-CMD ["java", "-jar", "/usr/ana.jar", "spark://spark-master:7077"]
+docker service create --name ana -p 4040:4040 --network spark-nw --restart-condition none -e ENABLE_INIT_DAEMON=false -e SPARK_APPLICATION_JAR_NAME=ana -e SPARK_APPLICATION_JAR_LOCATION=/app/ana.jar -e SPARK_APPLICATION_MAIN_CLASS=[your.group].Main --mount source=$(pwd)/ana.jar,target=/app/ana.jar,type=bind bde2020/spark-submit:2.4.5-hadoop2.7
 ```
 
-Build and submit your job to spark:
+You can read your application driver logs: `docker service logs -f ana`
 
-```
-docker build -t ana .
-docker tag ana localhost:5000/ana
-docker push localhost:5000/ana
-docker service create --name ana --restart-condition none --network spark-nw -p 4040:4040 localhost:5000/ana
-docker service logs -f ana
-```
-
-You can check your task at http://192.168.2.100:4040.
-
-Use ^D to exit logs.
+Once finished, delete the ana service:  `docker service rm ana`
 
 ## Stopping the Vagrant swarm cluster
 
@@ -134,5 +104,4 @@ Exit the docker-01 node.
 
 ```
 vagrant destroy -f
-rm etcd_token_url
 ```
