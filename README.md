@@ -84,7 +84,6 @@ Then configure your browser to use an HTTP proxy server with host `192.168.2.100
 ## Submitting your Spark analysis
 
 In case you use the Vagrant approach, you must have [uploaded](#uploading-jar-to-vagrant-node) your Spark program and logged in to docker-01 using `vagrant ssh`.
-```
 
 We assume here that your Spark analysis is available on ./ana.jar.
 
