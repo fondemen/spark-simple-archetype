@@ -9,7 +9,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOError;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -30,16 +29,18 @@ import java.util.StringTokenizer;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import org.apache.commons.httpclient.util.DateParseException;
-import org.apache.commons.httpclient.util.DateUtil;
 import org.apache.commons.io.IOUtils;
 import org.apache.http.Header;
+import org.apache.http.client.utils.DateUtils;
 import org.apache.http.message.BasicHeader;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
+import ${package}.utils.CloseableIterator;
+import ${package}.utils.HttpClientUtils;
 import ${package}.utils.HttpClientUtils.ContentStreamWithRetries;
+import ${package}.utils.HttpClientUtils.Response;
 import ${package}.utils.HttpClientUtils.Response;
 import scala.Tuple2;
 
@@ -47,9 +48,9 @@ public class Utils {
 
 	/**
 	 * Download contents of an url as found by an HTTP GET.
-	 * Note that full content resides in memory; prefer {@link ${symbol_pound}readLineByLine(URL)} to read line by line.
-	 * @see ${symbol_pound}readLineByLine(URL)
-	 * @see ${symbol_pound}downloadIfAbsent(URL, File)
+	 * Note that full content resides in memory; prefer {@link #readLineByLine(URL)} to read line by line.
+	 * @see #readLineByLine(URL)
+	 * @see #downloadIfAbsent(URL, File)
  	 * @return the content of the represented resource
 	 */
 	public static String download(URL url) throws Exception {
@@ -83,7 +84,7 @@ public class Utils {
 		Header[] headers;
 		if (exists) {
 			Date lastModifiedDate = new Date(dest.lastModified());
-			headers = new Header[] {new BasicHeader("If-Modified-Since", DateUtil.formatDate(lastModifiedDate))};
+			headers = new Header[] {new BasicHeader("If-Modified-Since", DateUtils.formatDate(lastModifiedDate))};
 		} else {
 			headers = new Header[0];
 		}
@@ -102,12 +103,8 @@ public class Utils {
 			// Setting modification time if available
 			Header lastModified = in.getResponse().getLastHeader("Last-Modified");
 			if (lastModified != null) {
-				try {
-					Date lastModifiedDate = DateUtil.parseDate(lastModified.getValue());
-					tmpFile.setLastModified(lastModifiedDate.getTime());
-				} catch (DateParseException e) {
-					System.err.println("Weird last-modified date sent from server for url " + url.toExternalForm() + ": " + lastModified.getValue());
-				}
+				Date lastModifiedDate = DateUtils.parseDate(lastModified.getValue());
+				tmpFile.setLastModified(lastModifiedDate.getTime());
 			}
 			// Temp file to real file as atomically as possible
 			try {
@@ -137,7 +134,7 @@ public class Utils {
 	 * Avoids memory saturation in case of a large textual file with reasonably sized lines...
 	 * @param url the url of the textual resource
 	 * @return an iterator on the lines ; iterator MUST be eithetr closed or fully iterated for used resources to be freed
-	 * @see ${symbol_pound}readLineByLineTupleIterator(Object, URL)
+	 * @see #readLineByLineTupleIterator(Object, URL)
 	 */
 	public static CloseableIterator<String> readLineByLine(URL url) throws IOException {
 		try {
@@ -213,10 +210,10 @@ public class Utils {
 	/**
 	 * Transforms a multi-line text into a list of lines.
 	 * Note that all resides into memory.
-	 * @see ${symbol_pound}toLineSequenceIterator(String)
+	 * @see #toLineSequenceIterator(String)
 	 */
 	public static List<String> toLineSequence(String text) {
-		StringTokenizer st = new StringTokenizer(text, "${symbol_escape}n${symbol_escape}r${symbol_escape}f");
+		StringTokenizer st = new StringTokenizer(text, "\n\r\f");
 		List<String> ret = new LinkedList<>();
 		while (st.hasMoreTokens()) {
 			String line = st.nextToken();
@@ -227,11 +224,11 @@ public class Utils {
 
 	/**
 	 * Transforms a multi-line text into a list of lines.
-	 * Avoids duplicating the text into memory (unlike {@link ${symbol_pound}toLineSequence(String)}.
-	 * @see ${symbol_pound}toLineSequenceTupleIterator(Object, String)
+	 * Avoids duplicating the text into memory (unlike {@link #toLineSequence(String)}.
+	 * @see #toLineSequenceTupleIterator(Object, String)
 	 */
 	public static Iterator<String> toLineSequenceIterator(String text) {
-		StringTokenizer st = new StringTokenizer(text, "${symbol_escape}n${symbol_escape}r${symbol_escape}f");
+		StringTokenizer st = new StringTokenizer(text, "\n\r\f");
 		return new Iterator<String>() {
 
 			@Override
@@ -248,7 +245,7 @@ public class Utils {
 	}
 
 	/**
-	 * Same as {@link ${symbol_pound}readLineByLine(URL)} but returns for each line a {@link Tuple2} with key as given as parameter and value as the read line.
+	 * Same as {@link #readLineByLine(URL)} but returns for each line a {@link Tuple2} with key as given as parameter and value as the read line.
 	 * Hence, returned tuples all have the same (given) key.
 	 * @param key the (same) key for each returned tuple
 	 */
@@ -269,7 +266,7 @@ public class Utils {
 	}
 
 	/**
-	 * Same as {@link ${symbol_pound}toLineSequenceIterator(String)} but returns for each line a {@link Tuple2} with key as given as parameter and value as the read line.
+	 * Same as {@link #toLineSequenceIterator(String)} but returns for each line a {@link Tuple2} with key as given as parameter and value as the read line.
 	 * Hence, returned tuples all have the same (given) key.
 	 * @param key the key for each returned tuple
 	 */
@@ -304,7 +301,7 @@ public class Utils {
 	 * Characters " might be used for cell content (so that the cell separator can appear within a cell value), and can be escaped by being duplicated.
 	 * Note that text is duplicated into memory.
 	 * @param line the <a href="https://en.wikipedia.org/wiki/Comma-separated_values">CSV</a> row
-	 * @param separator the separator between cells (usually characters ,, ;, or ${symbol_escape}t)
+	 * @param separator the separator between cells (usually characters ,, ;, or \t)
 	 */
 	public static String[] fromCSV(String line, char separator) {
 
@@ -347,7 +344,7 @@ public class Utils {
 			}
 			
 			String cell = line.substring(start, end);
-			if (replaceDDQ) cell = cell.replaceAll("${symbol_escape}"${symbol_escape}"", "${symbol_escape}"");
+			if (replaceDDQ) cell = cell.replaceAll("\"\"", "\"");
 			
 			res.add(cell);
 			
