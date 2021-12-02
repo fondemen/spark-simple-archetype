@@ -20,8 +20,7 @@ public class Main {
 		String master = System.getProperty("spark.master");
 		if (master == null || master.trim().length() == 0) {
 			System.out.println("No master found ; running locally");
-			conf = conf
-				.setMaster("local[*]")
+			conf.setMaster("local[*]")
 				.set("spark.driver.host", "127.0.0.1")
 				;
 		} else {
