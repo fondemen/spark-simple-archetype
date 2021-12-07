@@ -14,7 +14,7 @@ mvn archetype:generate \
   -DartifactId=your_project \
   -DarchetypeGroupId=fr.uha.ensisa.ff \
   -DarchetypeArtifactId=spark-simple-archetype \
-  -DarchetypeVersion=0.0.6 \
+  -DarchetypeVersion=0.0.7 \
   -DinteractiveMode=false
 ```
 
