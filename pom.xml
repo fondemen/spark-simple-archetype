@@ -12,7 +12,7 @@
 
 	<groupId>fr.uha.ensisa.ff</groupId>
 	<artifactId>spark-simple-archetype</artifactId>
-	<version>0.0.6</version>
+	<version>0.0.8</version>
 	<packaging>maven-archetype</packaging>
 
 	<name>spark-simple-archetype</name>
