@@ -20,6 +20,7 @@
       <includes>
         <include>.gitignore</include>
         <include>.hgignore</include>
+        <include>.vscode/settings.json</include>
       </includes>
     </fileSet>
   </fileSets>
